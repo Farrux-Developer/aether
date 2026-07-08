@@ -328,7 +328,12 @@ function fmt(ts: number): string {
 function VideoTile({ stream, label, muted }: { stream: MediaStream; label: string; muted?: boolean }) {
   const ref = useRef<HTMLVideoElement | null>(null);
   useEffect(() => {
-    if (ref.current) ref.current.srcObject = stream;
+    const el = ref.current;
+    if (!el) return;
+    el.srcObject = stream;
+    // Explicitly start playback — browsers often won't autoplay a stream carrying audio,
+    // which is why the remote tile could stay silent. play() after a user gesture succeeds.
+    void el.play?.().catch(() => {});
   }, [stream]);
   return (
     <div className="flex flex-col items-center">

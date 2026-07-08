@@ -105,15 +105,7 @@ export class CallManager {
     await this.ensureMedia(video); // audio at minimum; caller's video still arrives via ontrack
     const pc = this.getPC(peer);
     await pc.setRemoteDescription(offer);
-    // Drain ICE candidates that arrived while the call was ringing.
-    for (const c of this.pendingCandidates.get(peer) ?? []) {
-      try {
-        await pc.addIceCandidate(c);
-      } catch {
-        /* ignore late/duplicate candidate */
-      }
-    }
-    this.pendingCandidates.delete(peer);
+    await this.drainCandidates(peer); // apply ICE that arrived while ringing
     this.pendingOffers.delete(peer);
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
@@ -140,19 +132,24 @@ export class CallManager {
         return;
       case "answer": {
         const pc = this.pcs.get(from);
-        if (pc) await pc.setRemoteDescription(data as RTCSessionDescriptionInit);
+        if (pc) {
+          await pc.setRemoteDescription(data as RTCSessionDescriptionInit);
+          await this.drainCandidates(from); // apply ICE buffered before the answer arrived
+        }
         return;
       }
       case "candidate": {
         const pc = this.pcs.get(from);
-        if (pc) {
+        // Add only once remoteDescription exists; otherwise addIceCandidate throws and the
+        // candidate is lost → ICE can't complete → black + silent remote. Buffer until ready.
+        if (pc && pc.remoteDescription) {
           try {
             await pc.addIceCandidate(data as RTCIceCandidateInit);
           } catch {
-            /* candidate before remote desc; browser retries */
+            /* ignore duplicate */
           }
         } else {
-          // Ringing but not yet accepted → buffer until accept() sets the remote description.
+          // Ringing/awaiting remote desc → buffer until it's set.
           const buf = this.pendingCandidates.get(from) ?? [];
           buf.push(data as RTCIceCandidateInit);
           this.pendingCandidates.set(from, buf);
@@ -160,6 +157,20 @@ export class CallManager {
         return;
       }
     }
+  }
+
+  // Apply and clear any ICE candidates buffered for a peer (call after setRemoteDescription).
+  private async drainCandidates(peer: string): Promise<void> {
+    const pc = this.pcs.get(peer);
+    if (!pc) return;
+    for (const c of this.pendingCandidates.get(peer) ?? []) {
+      try {
+        await pc.addIceCandidate(c);
+      } catch {
+        /* ignore duplicate/late candidate */
+      }
+    }
+    this.pendingCandidates.delete(peer);
   }
 
   hangup(peer: string): void {
