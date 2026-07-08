@@ -14,8 +14,13 @@ export default function Home() {
         />
         <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
           <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+            Aether — global comms core
           </h1>
+          <div className="flex flex-wrap gap-4 text-sm font-medium">
+            <a href="/messenger" className="text-blue-600 underline dark:text-blue-400">Open the messenger →</a>
+            <a href="/aether" className="text-zinc-600 underline dark:text-zinc-400">Auth internals demo</a>
+            <a href="/api/selftest" className="text-zinc-600 underline dark:text-zinc-400">Run self-test</a>
+          </div>
           <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
             Looking for a starting point or more instructions? Head over to{" "}
             <a
